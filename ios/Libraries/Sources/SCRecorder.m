@@ -89,7 +89,9 @@ static char* SCRecorderPhotoOptionsContext = "PhotoOptionsContext";
         [_audioConfiguration addObserver:self forKeyPath:@"enabled" options:NSKeyValueObservingOptionNew context:SCRecorderAudioEnabledContext];
         [_photoConfiguration addObserver:self forKeyPath:@"options" options:NSKeyValueObservingOptionNew context:SCRecorderPhotoOptionsContext];
         
-        _context = [SCContext new].CIContext;
+        SCContextType contextType = [SCContext suggestedContextType];
+        _context = [SCContext contextWithType:contextType options:nil].CIContext;
+      
     }
     
     return self;
@@ -622,13 +624,13 @@ static char* SCRecorderPhotoOptionsContext = "PhotoOptionsContext";
     
     CIImage *image = [CIImage imageWithCVPixelBuffer:sampleBufferImage];
     CFTimeInterval seconds = CMTimeGetSeconds(time);
-    
+  
+    if (filterGroup != nil) {
+      image = [filterGroup imageByProcessingImage:image atTime:seconds];
+    }
+  
     if (transformFilter != nil) {
         image = [transformFilter imageByProcessingImage:image atTime:seconds];
-    }
-    
-    if (filterGroup != nil) {
-        image = [filterGroup imageByProcessingImage:image atTime:seconds];
     }
     
     CVPixelBufferLockBaseAddress(pixelBuffer, 0);
@@ -968,11 +970,11 @@ static char* SCRecorderPhotoOptionsContext = "PhotoOptionsContext";
                         AVCaptureConnection *videoConnection = [self videoConnection];
                         if ([videoConnection isVideoStabilizationSupported]) {
                             if ([videoConnection respondsToSelector:@selector(setPreferredVideoStabilizationMode:)]) {
-                                videoConnection.preferredVideoStabilizationMode = AVCaptureVideoStabilizationModeAuto;
+                                videoConnection.preferredVideoStabilizationMode = AVCaptureVideoStabilizationModeOff;
                             } else {
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
-                                videoConnection.enablesVideoStabilizationWhenAvailable = YES;
+                                videoConnection.enablesVideoStabilizationWhenAvailable = NO;
 #pragma clang diagnostic pop
                             }
                         }

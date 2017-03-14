@@ -16,20 +16,20 @@
    SCRecordSession *_session;
    /* Preview view ¨*/
    UIView *_previewView;
+   /* Live filter view */
+   SCFilterImageView *_scImageView;
    /* Configuration */
    NSDictionary *_config;
    /* Camera type (front || back) */
    NSString *_device;
    /* Flash mode */
    NSInteger flashMode;
-
    /* Video format */
    NSString *_videoFormat;
    /* Video quality */
    NSString *_videoQuality;
    /* Video filters */
    NSArray *_videoFilters;
-
    /* Audio quality */
    NSString *_audioQuality;
 }
@@ -69,6 +69,7 @@
    [self setVideoFormat:_videoFormat];
    _videoQuality = [RCTConvert NSString:[video objectForKey:@"quality"]];
    _videoFilters = [RCTConvert NSArray:[video objectForKey:@"filters"]];
+   _recorder.videoConfiguration.filter = [self createFilter];
 
    // Audio config
    _recorder.audioConfiguration.enabled = [RCTConvert BOOL:[audio objectForKey:@"enabled"]];
@@ -81,6 +82,10 @@
    if ([format isEqual:@"MPEG4AAC"]) {
       _recorder.audioConfiguration.format = kAudioFormatMPEG4AAC;
    }
+   
+   if (_scImageView != nil) {
+      _scImageView.filter = [self createFilter];
+   }
 }
 
 - (void)setDevice:(NSString*)device
@@ -88,8 +93,15 @@
    _device = device;
    if ([device  isEqual: @"front"]) {
       _recorder.device = AVCaptureDevicePositionFront;
+      [_recorder setKeepMirroringOnWrite:YES];
+      if (_scImageView != nil) {
+         [_recorder.SCImageView setTransform:CGAffineTransformMakeScale(-1.0f, 1.0f)];
+      }
    } else if ([device  isEqual: @"back"]) {
       _recorder.device = AVCaptureDevicePositionBack;
+      if (_scImageView != nil) {
+         [_recorder.SCImageView setTransform:CGAffineTransformIdentity];
+      }
    }
 }
 
@@ -155,12 +167,37 @@
 
          // CIfilter specified
          if ([propkey isEqualToString:@"CIfilter"]) {
-            NSString *name = [RCTConvert NSString:[subfilter objectForKey:propkey]];
-            subscfilter = [SCFilter filterWithCIFilterName:name];
-            if (subscfilter == nil) {
+            NSDictionary *filterInfo = [RCTConvert NSDictionary:[subfilter objectForKey:propkey]];
+            NSString *name = [RCTConvert NSString:[filterInfo objectForKey:@"name"]];
+            CIFilter *filter = nil;
+            if ([filterInfo objectForKey:@"options"] == nil) {
+               filter = [CIFilter filterWithName:name];
+            } else {
+               NSDictionary *filterOptions = [RCTConvert NSDictionary:[filterInfo objectForKey:@"options"]];
+               filter = [CIFilter filterWithName:name withInputParameters:filterOptions];
+            }
+            if (filter == nil) {
                RCTLogError(@"CIfilter %@ not found", name);
                subscfilter = [SCFilter emptyFilter];
+            } else {
+               subscfilter = [SCFilter filterWithCIFilter:filter];
             }
+         }
+         else if ([propkey isEqualToString:@"CICustomOverlayFilter"]) {
+            NSString *path = [RCTConvert NSString:[subfilter objectForKey:propkey]];
+            CGSize size = [[UIScreen mainScreen] bounds].size;
+            UIImage* ogImage = [UIImage imageNamed:path];
+            UIGraphicsBeginImageContextWithOptions(size, NO, [UIScreen mainScreen].scale);
+            [ogImage drawInRect:CGRectMake(0,0,size.width,size.height) blendMode:kCGBlendModeNormal alpha:0.35f];
+            UIImage *newImage = UIGraphicsGetImageFromCurrentImageContext();
+            NSData *imageData = UIImagePNGRepresentation(newImage);
+            UIGraphicsEndImageContext();
+            CIImage *overlayImage = [CIImage imageWithData:imageData];
+            CIFilter *overlayFilter = [CIFilter filterWithName:@"CIOverlayBlendMode"
+                                           withInputParameters:@{
+                                                                 @"inputBackgroundImage": overlayImage
+                                                                 }];
+            subscfilter = [SCFilter filterWithCIFilter:overlayFilter];
          }
          // Filter file specified
          else if ([propkey isEqualToString:@"file"]) {
@@ -255,9 +292,6 @@
    assetExportSession.videoConfiguration.preset = _videoQuality;
    assetExportSession.audioConfiguration.preset = _audioQuality;
 
-   // Apply filters
-   assetExportSession.videoConfiguration.filter = [self createFilter];
-
    [assetExportSession exportAsynchronouslyWithCompletionHandler: ^{
       callback(assetExportSession.error, assetExportSession.outputUrl);
    }];
@@ -289,13 +323,20 @@
 {
    [super layoutSubviews];
 
-   if (_previewView == nil) {
+   if (_scImageView == nil) {
       _previewView = [[UIView alloc] initWithFrame:self.bounds];
       _recorder.previewView = _previewView;
+      
+      _scImageView = [[SCFilterImageView alloc] initWithFrame:self.bounds];
+      _scImageView.CIImage = [CIImage imageWithColor:[CIColor colorWithRed:0 green:0 blue:0 alpha:1.0]];
+      _scImageView.filter = [self createFilter];
+      _recorder.SCImageView = _scImageView;
+      
       [_previewView setBackgroundColor:[UIColor blackColor]];
+      [_previewView addSubview:_scImageView];
+      
       [self insertSubview:_previewView atIndex:0];
       [_recorder startRunning];
-
       _session = [SCRecordSession recordSession];
       [self setVideoFormat:_videoFormat];
       _recorder.session = _session;

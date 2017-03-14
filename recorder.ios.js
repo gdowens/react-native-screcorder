@@ -111,9 +111,14 @@ export default class Recorder extends Component {
               "duration": 0.5
             }]
           },*/
+          /*{"CICustomOverlayFilter": "overlay_image_name"}*/
           /*{"file": "b_filter"},*/
-          /*{"CIfilter":"CIColorControls", "inputSaturation": 0},
-          {"CIfilter":"CIExposureAdjust", "inputEV": 0.7}*/
+          /*{"CIfilter":"CIColorControls",
+              "options": {
+                "inputSaturation": 0
+              }
+            },
+          */
         ]
       },
       audio: {
