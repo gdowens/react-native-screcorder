@@ -82,7 +82,7 @@
    if ([format isEqual:@"MPEG4AAC"]) {
       _recorder.audioConfiguration.format = kAudioFormatMPEG4AAC;
    }
-   
+
    if (_scImageView != nil) {
       _scImageView.filter = [self createFilter];
    }
@@ -183,12 +183,33 @@
                subscfilter = [SCFilter filterWithCIFilter:filter];
             }
          }
-         else if ([propkey isEqualToString:@"CICustomOverlayFilter"]) {
-            NSString *path = [RCTConvert NSString:[subfilter objectForKey:propkey]];
+         else if ([propkey isEqualToString:@"CICustomHardLightFilter"]) {
+            NSDictionary *filterInfo = [RCTConvert NSDictionary:[subfilter objectForKey:propkey]];
+            NSString *path = [RCTConvert NSString:[filterInfo objectForKey:@"path"]];
+            CGFloat opacity = [RCTConvert CGFloat:[filterInfo objectForKey:@"opacity"]];
             CGSize size = [[UIScreen mainScreen] bounds].size;
             UIImage* ogImage = [UIImage imageNamed:path];
             UIGraphicsBeginImageContextWithOptions(size, NO, [UIScreen mainScreen].scale);
-            [ogImage drawInRect:CGRectMake(0,0,size.width,size.height) blendMode:kCGBlendModeNormal alpha:0.35f];
+            [ogImage drawInRect:CGRectMake(0,0,size.width,size.height) blendMode:kCGBlendModeNormal alpha:opacity];
+            UIImage *newImage = UIGraphicsGetImageFromCurrentImageContext();
+            NSData *imageData = UIImagePNGRepresentation(newImage);
+            UIGraphicsEndImageContext();
+            CIImage *overlayImage = [CIImage imageWithData:imageData];
+            CIFilter *overlayFilter = [CIFilter filterWithName:@"CIHardLightBlendMode"
+                                           withInputParameters:@{
+                                                                 @"inputBackgroundImage": overlayImage
+                                                                 }];
+            subscfilter = [SCFilter filterWithCIFilter:overlayFilter];
+         }
+         else if ([propkey isEqualToString:@"CICustomOverlayFilter"]) {
+//            NSString *path = [RCTConvert NSString:[subfilter objectForKey:propkey]];
+            NSDictionary *filterInfo = [RCTConvert NSDictionary:[subfilter objectForKey:propkey]];
+            NSString *path = [RCTConvert NSString:[filterInfo objectForKey:@"path"]];
+            CGFloat opacity = [RCTConvert CGFloat:[filterInfo objectForKey:@"opacity"]];
+            CGSize size = [[UIScreen mainScreen] bounds].size;
+            UIImage* ogImage = [UIImage imageNamed:path];
+            UIGraphicsBeginImageContextWithOptions(size, NO, [UIScreen mainScreen].scale);
+            [ogImage drawInRect:CGRectMake(0,0,size.width,size.height) blendMode:kCGBlendModeNormal alpha:opacity];
             UIImage *newImage = UIGraphicsGetImageFromCurrentImageContext();
             NSData *imageData = UIImagePNGRepresentation(newImage);
             UIGraphicsEndImageContext();
@@ -326,15 +347,15 @@
    if (_scImageView == nil) {
       _previewView = [[UIView alloc] initWithFrame:self.bounds];
       _recorder.previewView = _previewView;
-      
+
       _scImageView = [[SCFilterImageView alloc] initWithFrame:self.bounds];
       _scImageView.CIImage = [CIImage imageWithColor:[CIColor colorWithRed:0 green:0 blue:0 alpha:1.0]];
       _scImageView.filter = [self createFilter];
       _recorder.SCImageView = _scImageView;
-      
+
       [_previewView setBackgroundColor:[UIColor blackColor]];
       [_previewView addSubview:_scImageView];
-      
+
       [self insertSubview:_previewView atIndex:0];
       [_recorder startRunning];
       _session = [SCRecordSession recordSession];
