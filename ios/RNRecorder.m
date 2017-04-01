@@ -24,6 +24,8 @@
    NSString *_device;
    /* Flash mode */
    NSInteger flashMode;
+   /* Time Modulations */
+   NSArray *_timeScales;
    /* Video format */
    NSString *_videoFormat;
    /* Video quality */
@@ -123,6 +125,11 @@
       default:
          break;
    }
+}
+
+- (void)setTimeScales: (NSArray *)timeScales
+{
+   _timeScales = [RCTConvert NSArray:timeScales];
 }
 
 - (void)setVideoFormat:(NSString*)format
@@ -306,7 +313,12 @@
 
 - (void)save:(void(^)(NSError *error, NSURL *outputUrl))callback
 {
-   AVAsset *asset = _session.assetRepresentingSegments;
+   AVAsset *asset;
+   if (_timeScales != nil) {
+      asset = [_session assetRepresentingSegmentsWithTimeModifiers:_timeScales];
+   } else {
+      asset = [_session assetRepresentingSegments];
+   }
    SCAssetExportSession *assetExportSession = [[SCAssetExportSession alloc] initWithAsset:asset];
    assetExportSession.outputFileType = _videoFormat;
    assetExportSession.outputUrl = [_session outputUrl];

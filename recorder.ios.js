@@ -39,7 +39,8 @@ export default class Recorder extends Component {
     config: PropTypes.object,
     device: PropTypes.string,
     flashMode: PropTypes.number,
-    onNewSegment: PropTypes.func
+    onNewSegment: PropTypes.func,
+    timeScales: PropTypes.array,
   }
 
   /*** PUBLIC METHODS ***/
